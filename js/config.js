@@ -5,10 +5,3 @@ include.libraries.local = {
 	},
 	managed: true
 };
-include()
-	.load('local','plugin')
-.loaded(function() {
-	jQuery(function($) {
-		$('body').test();
-	});
-});

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title></title>
+		<link rel="stylesheet" type="text/css" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/ui-lightness/jquery-ui.min.css"/>
+	</head>
+	<body>
+		<script src="js/include.js"></script>
+		<script src="js/config.js"></script>
+		<script>
+			include()
+				.load('local','plugin')
+			.loaded(function() {
+				jQuery(function($) {
+					$('body').test();
+				});
+			});
+		</script>
+	</body>
+</html>
