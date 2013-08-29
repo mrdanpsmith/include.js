@@ -11,5 +11,5 @@ include()
 			return this;
 		};
 	})(jQuery);
-	include.markLoaded('local','plugin','snapshot');
+	include.markLoaded('local','simple-plugin','snapshot');
 });
