@@ -1,159 +1,153 @@
-var include = function(includes) {
-	return {
-		load: function(source,name,version) {
-			var library = include.util.libraryFrom(source,name,version);
-			this.includes.push(library);
-			include._load(library);
-			return this;
-		},
-		then: function(source,name,version) {
-			var library = include.util.libraryFrom(source,name,version);
-			var dependencies = include(this.includes);
-			dependencies.loaded(function() {
-				include._load(library);
-			});
-			this.includes.push(library);
-			return dependencies;
-		},
-		loaded: function(callback) {
-			include._listen({
-				includes: this.includes,
-				callback: callback
-			});
-			return this;
-		},
-		includes: includes ? includes.slice(0) : new Array()
-	};
+include = {};
+
+include.libraries = {};
+
+include.resolvers = {
+	standard: function(name,metadata) {
+		return this.url + metadata.path + '/' + metadata.version + '/' + metadata.filename;
+	}
 };
-include.libraries = {
+
+include.sources = {
 	google: {
 		url: '//ajax.googleapis.com/ajax/libs/',
-		path: function(library) {
-			if (library.name === 'jqueryui') {
-				return this.url + library.name + '/' + library.version + '/jquery-ui.min.js';
-			}
-		}
+		resolver: include.resolvers.standard
 	},
 	cdnjs: {
 		url: '//cdnjs.cloudflare.com/ajax/libs/',
-		path: function(library) {
-			if (library.name === 'jqueryui') {
-				return this.url + library.name + '/' + library.version + '/jquery-ui.min.js';
+		resolver: include.resolvers.standard
+	}
+};
+
+include.set = function(needs) {
+	return {
+		load: function(name) {
+			include._load(name);
+			this.needs.push(name);
+			return this;
+		},
+		chain: function(name) {
+			include._load(name,this.needs);
+			this.needs.push(name);
+			return this;
+		},
+		loaded: function(callback) {
+			if (include._fulfilled(this.needs)) {
+				callback();
+			} else {
+				include._listen({
+					needs: this.needs,
+					callback: callback
+				});
 			}
-		}
-	}
+		},
+		needs: needs ? needs.slice(0): new Array()
+	};
 };
-include.markLoaded = function(source,name,version) {
-	this._markLoaded(include.util.libraryFrom(source,name,version));
-};
-include._listeners = new Array();
-include._load = function(library) {
-	if (!this._isLoaded(library) && !this._wasQueued(library)) {
-		this.util.load(library);
-	}
-};
-include._markLoaded = function(library) {
-	if (!include.libraries[library.source].loaded) {
-		include.libraries[library.source].loaded = {};
-	}
-	if (!include.libraries[library.source].loaded[library.name]) {
-		include.libraries[library.source].loaded[library.name] = {};
-	}
-	include.libraries[library.source].loaded[library.name][library.version] = true;
+
+include.loaded = function(name) {
+	include._markLoaded(name);
 	include._notifyListeners();
 };
-include._markQueued = function(library) {
-	if (!include.libraries[library.source].queued) {
-		include.libraries[library.source].queued = {};
+
+include._listeners = new Array();
+
+include._load = function(name,needs) {
+	if (!needs) {
+		needs = include.__metadata(name).needs;
 	}
-	if (!include.libraries[library.source].queued[library.name]) {
-		include.libraries[library.source].queued[library.name] = {};
+	for (var i = 0; needs && i < needs.length; i++) {
+		include._load(needs[i]);
 	}
-	include.libraries[library.source].queued[library.name][library.version] = true;
+	var chain = include.set(needs);
+	chain.loaded(function() {
+		include.__load(name);
+	});
 };
+
+include.__load = function(name) {
+	var metadata = include.__metadata(name);
+	if (metadata.loaded || metadata.loading) return;
+
+	var source = include.sources[metadata.source];
+	var url = source.resolver(name,metadata);
+	var managed = source.managed || metadata.managed;
+
+	metadata.loading = true;
+	include.__loadScript(name,url,managed);
+};
+
+include._markLoaded = function(name) {
+	include.libraries[name].loaded = true;
+	include.libraries[name].loading = undefined;
+};
+
 include._notifyListeners = function() {
-	for (var i = this._listeners.length - 1; i >= 0; i--) {
-		var listener = this._listeners[i];
-		var waiting = false;
-		for (var j = 0; j < listener.includes.length; j++) {
-			var include = listener.includes[j];
-			if (!this._isLoaded(include)) {
-				waiting = true;	
-			}
-		}
-		if (!waiting && !listener.called) {
-			listener.called = true;
+	for (var i = 0; include._listeners.length > 0 && i < include._listeners.length; i++) {
+		var listener = include._listeners[i];
+		if (include._fulfilled(listener.needs)) {
+			include._listeners.splice(i--,1);
 			listener.callback();
 		}
 	}
 };
-include._isLoaded = function(library) {
-	return (this.libraries[library.source] &&
-		this.libraries[library.source].loaded && 
-			this.libraries[library.source].loaded[library.name] &&
-				(!library.version || this.libraries[library.source].loaded[library.name][library.version]));
-};
-include._wasQueued = function(library) {
-	return (this.libraries[library.source] &&
-		this.libraries[library.source].queued &&
-			this.libraries[library.source].queued[library.name] &&
-				(!library.version || this.libraries[library.source].queued[library.name][library.version]));
-};
-include._listen = function(listener) {
-	this._listeners.push(listener);
-	this._notifyListeners();
-};
-include._library = function(name, version) {
-	if (!this.util.scriptLoaded(name,version)) {
-		var error = "IncludeError: library " + name;
-		if (version) {
-			error += " v" + version;
+
+include._fulfilled = function(needs) {
+	var fulfilled = true;
+	for (var i = 0; i < needs.length; i++) {
+		if (!include.__isLoaded(needs[i])) {
+			fulfilled = false;
+			break;
 		}
-		error += " is not loaded.";
-		throw error;
 	}
+	return fulfilled;
 };
-include.util = {
-	path: function(library) {
-		return this.url + library.name + '/' + library.version + '/' + library.name + '.min.js';
-	},
-	buildPath: function(library) {
-		var source = include.libraries[library.source];
-		var result;
-		if (source.path) {
-			var result = source.path.call(source,library);
+
+include._listen = function(listener) {
+	include._listeners.push(listener);
+};
+
+include.__metadata = function(name) {
+	var metadata = include.libraries[name];
+	if (!metadata) include.__configError(name);
+	if (!include.sources[metadata.source] || !include.sources[metadata.source].resolver) include.__configError(name,'source');
+	return metadata;
+};
+
+include.__configError = function(name,field) {
+	throw {
+		name: 'IncludeConfigException',
+		message: field ? name + ' does not have a correctly configured ' + field + '.' : name + ' is not correctly configured.',
+		toString: function() {
+			return this.name + ': ' + this.message;
 		}
-		return (result) ? result : this.path.call(source,library);
-	},
-	load: function(library,callback) {
-		var completeCalled = false;
-		var head = document.getElementsByTagName('head')[0];
-		var script = document.createElement('script');
-		script.type = 'text/javascript';
-		if (!include.libraries[library.source].managed) {
-			script.onreadystatechange = function() {
-				if (!completeCalled && (this.readyState == 'complete' || this.readyState == 'loaded')) {
-					if (this.status == 200) {
-						complete.call(this);
-					} else {
-						throw 'IncludeError: Error loading library ' + library.name + ' v' + library.version + ' from ' + library.source + '.  Status: ' + this.status;
-					}
+	};
+};
+
+include.__loadScript = function(name,url,managed) {
+	if (window.console) console.log('Loading: ' + url);
+	var head = document.getElementsByTagName('head')[0];
+	var script = document.createElement('script');
+	script.type = 'text/javascript';
+	if (!managed) {
+		var complete = function() {
+			include.loaded(name);
+		};
+		script.onreadystatechange = function() {
+			if (this.readyState == 'complete' || this.readyState == 'loaded') {
+				if (!this.status || this.status == 200) {
+					complete();
+				} else {
+					throw 'Error loading ' + name + '.  Status: ' + this.status;
 				}
 			}
-			script.onload = complete;
-			function complete() {
-				include._markLoaded(library);
-			}
 		}
-		script.src = include.util.buildPath(library);
-		head.appendChild(script);
-		include._markQueued(library);
-	},
-	libraryFrom: function(source,name,version) {
-		return {
-			source: source,
-			name: name,
-			version: version
-		};
+		script.onload = complete;
 	}
+	script.src = url;
+	head.appendChild(script);
+};
+
+include.__isLoaded = function(name) {
+	return include.libraries[name].loaded;
 };

@@ -1,6 +1,5 @@
-include()
-	.load('google','jquery','1.10.2')
-	.then('google','jqueryui','1.10.3')
+include.set()
+	.load('jqueryui')
 .loaded(function() {
 	(function($) {
 		$.fn.test = function() {
@@ -11,5 +10,5 @@ include()
 			return this;
 		};
 	})(jQuery);
-	include.markLoaded('local','simple-plugin','snapshot');
+	include.loaded('plugindemo');
 });
