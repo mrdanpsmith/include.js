@@ -1,11 +1,14 @@
+include.libraries.local = {
+	url: 'js/',
+	path: function(library) {
+		return this.url + library.name + '.js';
+	},
+	managed: true
+};
 include()
-	.load('google','jquery','1.10.2')
-	.andThen('google','jqueryui','1.10.3')
+	.load('local','plugin')
 .loaded(function() {
 	jQuery(function($) {
-		var test = $('<div>This is a dialog</div>');
-		test.attr('title','Hey there!');
-		$('body').append(test);
-		test.dialog();
+		$('body').test();
 	});
 });

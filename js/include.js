@@ -6,14 +6,14 @@ var include = function(includes) {
 			include._load(library);
 			return this;
 		},
-		andThen: function(source,name,version) {
+		then: function(source,name,version) {
 			var library = include.util.libraryFrom(source,name,version);
 			var dependencies = include(this.includes);
 			dependencies.loaded(function() {
 				include._load(library);
 			});
 			this.includes.push(library);
-			return this;
+			return dependencies;
 		},
 		loaded: function(callback) {
 			include._listen({
@@ -43,6 +43,9 @@ include.libraries = {
 		}
 	}
 };
+include.markLoaded = function(source,name,version) {
+	this._markLoaded(include.util.libraryFrom(source,name,version));
+};
 include._listeners = new Array();
 include._load = function(library) {
 	if (!this._isLoaded(library)) {
@@ -56,7 +59,7 @@ include._markLoaded = function(library) {
 	if (!include.libraries[library.source].loaded[library.name]) {
 		include.libraries[library.source].loaded[library.name] = {};
 	}
-	include.libraries[library.source].loaded[library.name][library.version] = library.tag;
+	include.libraries[library.source].loaded[library.name][library.version] = true;
 	include._notifyListeners();
 };
 include._notifyListeners = function() {
@@ -70,8 +73,8 @@ include._notifyListeners = function() {
 			}
 		}
 		if (!waiting && !listener.called) {
-			listener.callback();
 			listener.called = true;
+			listener.callback();
 		}
 	}
 };
@@ -112,22 +115,23 @@ include.util = {
 		var head = document.getElementsByTagName('head')[0];
 		var script = document.createElement('script');
 		script.type = 'text/javascript';
-		script.onreadystatechange = function() {
-			if (!completeCalled && (this.readyState == 'complete' || this.readyState == 'loaded')) {
-				if (this.status == 200) {
-					complete.call(this);
-				} else {
-					throw 'IncludeError: Error loading library ' + library.name + ' v' + library.version + ' from ' + library.source + '.  Status: ' + this.status;
+		if (!include.libraries[library.source].managed) {
+			script.onreadystatechange = function() {
+				if (!completeCalled && (this.readyState == 'complete' || this.readyState == 'loaded')) {
+					if (this.status == 200) {
+						complete.call(this);
+					} else {
+						throw 'IncludeError: Error loading library ' + library.name + ' v' + library.version + ' from ' + library.source + '.  Status: ' + this.status;
+					}
 				}
 			}
+			script.onload = complete;
+			function complete() {
+				include._markLoaded(library);
+			}
 		}
-		script.onload = complete;
 		script.src = include.util.buildPath(library);
 		head.appendChild(script);
-		function complete() {
-			library.tag = script;
-			include._markLoaded(library);
-		}
 	},
 	libraryFrom: function(source,name,version) {
 		return {
