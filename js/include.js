@@ -48,7 +48,7 @@ include.markLoaded = function(source,name,version) {
 };
 include._listeners = new Array();
 include._load = function(library) {
-	if (!this._isLoaded(library)) {
+	if (!this._isLoaded(library) && !this._wasQueued(library)) {
 		this.util.load(library);
 	}
 };
@@ -61,6 +61,15 @@ include._markLoaded = function(library) {
 	}
 	include.libraries[library.source].loaded[library.name][library.version] = true;
 	include._notifyListeners();
+};
+include._markQueued = function(library) {
+	if (!include.libraries[library.source].queued) {
+		include.libraries[library.source].queued = {};
+	}
+	if (!include.libraries[library.source].queued[library.name]) {
+		include.libraries[library.source].queued[library.name] = {};
+	}
+	include.libraries[library.source].queued[library.name][library.version] = true;
 };
 include._notifyListeners = function() {
 	for (var i = this._listeners.length - 1; i >= 0; i--) {
@@ -82,7 +91,13 @@ include._isLoaded = function(library) {
 	return (this.libraries[library.source] &&
 		this.libraries[library.source].loaded && 
 			this.libraries[library.source].loaded[library.name] &&
-				(!library.version || this.libraries[library.source].loaded[library.name][library.version]))
+				(!library.version || this.libraries[library.source].loaded[library.name][library.version]));
+};
+include._wasQueued = function(library) {
+	return (this.libraries[library.source] &&
+		this.libraries[library.source].queued &&
+			this.libraries[library.source].queued[library.name] &&
+				(!library.version || this.libraries[library.source].queued[library.name][library.version]));
 };
 include._listen = function(listener) {
 	this._listeners.push(listener);
@@ -132,6 +147,7 @@ include.util = {
 		}
 		script.src = include.util.buildPath(library);
 		head.appendChild(script);
+		include._markQueued(library);
 	},
 	libraryFrom: function(source,name,version) {
 		return {
