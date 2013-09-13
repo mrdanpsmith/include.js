@@ -3,7 +3,10 @@ include = {};
 include.libraries = {};
 
 include.resolvers = {
-	standard: function(name,metadata) {
+	default: function(name,metadata) {
+		return metadata.url;
+	},
+	cdn: function(name,metadata) {
 		return this.url + metadata.path + '/' + metadata.version + '/' + metadata.filename;
 	}
 };
@@ -11,11 +14,14 @@ include.resolvers = {
 include.sources = {
 	google: {
 		url: '//ajax.googleapis.com/ajax/libs/',
-		resolver: include.resolvers.standard
+		resolver: include.resolvers.cdn
 	},
 	cdnjs: {
 		url: '//cdnjs.cloudflare.com/ajax/libs/',
-		resolver: include.resolvers.standard
+		resolver: include.resolvers.cdn
+	},
+	default: {
+		resolver: include.resolvers.default
 	}
 };
 
@@ -110,6 +116,7 @@ include._listen = function(listener) {
 include.__metadata = function(name) {
 	var metadata = include.libraries[name];
 	if (!metadata) include.__configError(name);
+	if (!metadata.source) metadata.source = 'default';
 	if (!include.sources[metadata.source] || !include.sources[metadata.source].resolver) include.__configError(name,'source');
 	return metadata;
 };

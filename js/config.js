@@ -1,4 +1,4 @@
-include.sources.local = {
+include.sources.localplugin = {
 	url: 'js/',
 	resolver: function(name,metadata) {
 		return this.url + 'jquery.' + name + '.js';
@@ -20,5 +20,5 @@ include.libraries.jqueryui = {
 	needs: ['jquery']
 };
 include.libraries.plugindemo = {
-	source: 'local'
+	source: 'localplugin'
 };

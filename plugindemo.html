@@ -6,10 +6,13 @@
 	</head>
 	<body>
 		<script src="include.js"></script>
-		<script src="js/config.js"></script>
 		<script>
+			include.libraries.config = {
+				url: 'js/config.js'
+			};
 			include.set()
-				.load('plugindemo')
+				.load('config')
+				.chain('plugindemo')
 			.loaded(function() {
 				jQuery(function($) {
 					$('body').test();
